@@ -1,0 +1,7 @@
+streamlit==1.49.1
+schedule==1.2.2
+langchain==0.3.27
+langchain-community==0.3.27
+langchain-google-genai==2.1.12
+langgraph==0.6.7
+langgraph-checkpoint-sqlite==2.0.11
