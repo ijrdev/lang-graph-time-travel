@@ -13,7 +13,7 @@ from src.nodes.content_generator import content_generator_node
 
 class MainGraph():
     def __init__(self):
-        self.sqlite_saver: SqliteSaver = SqliteSaver(sqlite3.connect("/data/database.db", check_same_thread = False))
+        self.sqlite_saver: SqliteSaver = SqliteSaver(sqlite3.connect("/data/db.db", check_same_thread = False))
 
         self.app: CompiledStateGraph = self._build_workflow()
         
