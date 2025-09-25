@@ -1,4 +1,4 @@
-import sqlite3
+import sqlite3, logging
 
 from langgraph.graph import StateGraph
 from langgraph.graph.state import CompiledStateGraph
@@ -13,7 +13,7 @@ from src.nodes.content_generator import content_generator_node
 
 class MainGraph():
     def __init__(self):
-        self.sqlite_saver: SqliteSaver = SqliteSaver(sqlite3.connect("/data/db.db", check_same_thread = False))
+        self.sqlite_saver: SqliteSaver = SqliteSaver(sqlite3.connect("data/db.db", check_same_thread = False))
 
         self.app: CompiledStateGraph = self._build_workflow()
         
@@ -49,7 +49,7 @@ class MainGraph():
 
     def _resume_workflow_from_checkpoint(self, thread_id: str, checkpoint_id: str) -> None:
         try:
-            print(f"Resumindo execução de um checkpoint_id: {checkpoint_id}.")
+            logging.info(f"Resumindo execução de um checkpoint_id: {checkpoint_id}.")
         
             # Nesse momento deve buscar no sqlite os dados do ckecpoint
             # E no final, atualizar a tabela dos assuntos.
@@ -60,7 +60,7 @@ class MainGraph():
             
             self.app.invoke(None, config)
             
-            print(f"Workflow concluído: {thread_id}.")
+            logging.info(f"Workflow concluído: {thread_id}.")
         except Exception as ex:
             raise ex
     
@@ -68,10 +68,10 @@ class MainGraph():
         try:
             # Já cria o assunto na base com uma thread_id vinculada.
             
-            print(f"Iniciando um novo workflow com a thread_id: {thread_id}.")
+            logging.info(f"Iniciando um novo workflow com a thread_id: {thread_id}.")
             
             self.app.invoke({"input": input}, {"configurable": {"thread_id": thread_id}})
             
-            print(f"Workflow concluído: {thread_id}.")
+            logging.info(f"Workflow concluído: {thread_id}.")
         except Exception as ex:
             raise ex

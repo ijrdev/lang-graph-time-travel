@@ -1,4 +1,4 @@
-import schedule, time
+import schedule, time, uuid, logging
 
 from concurrent.futures import ThreadPoolExecutor
 
@@ -8,25 +8,37 @@ def init() -> None:
     try:
         # Busca na base os que estão diferente de finalizados.
         # Pega os novos ou marcados para serem reprocessados no time travel.
-        subjects = []
-
+        subjects = [
+            {"input": "World Hello", "thread_id": uuid.uuid4()},
+        ]
+        
         if len(subjects) > 0:
             with ThreadPoolExecutor(max_workers = 5) as executor:
                 _ = [executor.submit(MainGraph().run, item) for item in subjects]
         else:
-            print("Nenhum assunto foi capturado.")
+            logging.error("Nenhum assunto foi capturado.")
     except Exception as ex:
         raise ex
 
-if __name__ == "":
+if __name__ == "__main__":
     try:
-        schedule.every(5).seconds.do(init)
-
-        print("⏳ Scheduler iniciado. Rodando jobs...")
+        logging.basicConfig(
+            level = logging.INFO,
+            format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+            datefmt = '%d-%m-%Y %H:%M:%S'
+        )
         
-        while True:
-            schedule.run_pending()
+        logging.info("⏳ Scheduler iniciado...")
+        
+        init()
+        
+        # schedule.every(5).seconds.do(init)
+        
+        # while True:
+        #     schedule.run_pending()
             
-            time.sleep(1)
+        #     time.sleep(1)
     except Exception as ex:
-        raise ex
+        logging.error(ex)
+        
+        exit(0)
