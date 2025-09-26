@@ -13,7 +13,10 @@ class SubjectsRepository():
         connection: Connection | None = None
         
         try:
-            connection = sqlite3.connect("../data/db.db", check_same_thread = False)
+            try:
+                connection = sqlite3.connect("../../data/db.db", check_same_thread = False)
+            except Exception as ex:
+                connection = sqlite3.connect("data/db.db", check_same_thread = False)
             
             cursor: Cursor = connection.cursor()
             
@@ -42,7 +45,10 @@ class SubjectsRepository():
         connection: Connection | None = None
         
         try:
-            connection = sqlite3.connect("../data/db.db", check_same_thread = False)
+            try:
+                connection = sqlite3.connect("../../data/db.db", check_same_thread = False)
+            except Exception as ex:
+                connection = sqlite3.connect("data/db.db", check_same_thread = False)
             
             cursor: sqlite3.Cursor = connection.cursor()
             
@@ -66,7 +72,10 @@ class SubjectsRepository():
         connection: Connection | None = None
         
         try:
-            connection = sqlite3.connect("../data/db.db", check_same_thread = False)
+            try:
+                connection = sqlite3.connect("../../data/db.db", check_same_thread = False)
+            except Exception as ex:
+                connection = sqlite3.connect("data/db.db", check_same_thread = False)
             
             cursor: Cursor = connection.cursor()
             
@@ -96,7 +105,10 @@ class SubjectsRepository():
         connection: Connection | None = None
         
         try:
-            connection = sqlite3.connect("../data/db.db", check_same_thread = False)
+            try:
+                connection = sqlite3.connect("../../data/db.db", check_same_thread = False)
+            except Exception as ex:
+                connection = sqlite3.connect("data/db.db", check_same_thread = False)
             
             cursor: Cursor = connection.cursor()
             
@@ -116,7 +128,10 @@ class SubjectsRepository():
         connection: Connection | None = None
         
         try:
-            connection = sqlite3.connect("../data/db.db", check_same_thread = False)
+            try:
+                connection = sqlite3.connect("../../data/db.db", check_same_thread = False)
+            except Exception as ex:
+                connection = sqlite3.connect("data/db.db", check_same_thread = False)
             
             query: str = f"SELECT * FROM subjects"
             params: tuple = ()

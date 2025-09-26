@@ -1,34 +1,40 @@
-import schedule, time, uuid, logging
+import schedule, time, logging, warnings, sys
 
 from concurrent.futures import ThreadPoolExecutor
 
-from src.graphs.main_graph import MainGraph
+from pandas import DataFrame
+
+from application.enums.status_enum import StatusEnum
+from services.graphs.main_graph import MainGraph
+from infrastructure.repositories.subjects_repository import SubjectsRepository
 
 def init() -> None:
     try:
-        # Busca na base os que estão diferente de finalizados.
-        # Pega os novos ou marcados para serem reprocessados no time travel.
-        subjects = [
-            {"input": "World Hello", "thread_id": uuid.uuid4()},
-        ]
-        
-        if len(subjects) > 0:
-            with ThreadPoolExecutor(max_workers = 5) as executor:
+        df: DataFrame = SubjectsRepository.get_all([StatusEnum.PENDING.value, StatusEnum.REPROCESS.value])
+                
+        if len(df) > 0:
+            subjects: list = df.to_dict("records")
+            
+            with ThreadPoolExecutor(max_workers = 1) as executor:
                 _ = [executor.submit(MainGraph().run, item) for item in subjects]
         else:
-            logging.error("Nenhum assunto foi capturado.")
+            logging.info("⏬ Nenhum assunto foi capturado.")
     except Exception as ex:
         raise ex
 
 if __name__ == "__main__":
     try:
+        warnings.filterwarnings('ignore')
+        
         logging.basicConfig(
-            level = logging.INFO,
-            format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-            datefmt = '%d-%m-%Y %H:%M:%S'
+            stream = sys.stdout, 
+            level = logging.INFO, 
+            encoding = "utf-8",
+            datefmt = "%d/%m/%Y %H:%M:%S",
+            format = "%(asctime)s - %(levelname)s - %(message)s",
         )
         
-        logging.info("⏳ Scheduler iniciado...")
+        logging.info("⏳ Scheduler iniciado!")
         
         init()
         

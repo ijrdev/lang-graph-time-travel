@@ -1,6 +1,6 @@
 import logging
 
-from src.states.main_state import MainState
+from services.states.main_state import MainState
 
 def content_generator_node(state: MainState) -> MainState:
     try:

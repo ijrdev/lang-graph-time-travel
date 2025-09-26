@@ -1,15 +1,18 @@
 import sqlite3, logging
 
+from pandas import DataFrame
 from langgraph.graph import StateGraph
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.checkpoint.sqlite import SqliteSaver
 
-from src.states.main_state import MainState
-from src.nodes.observer import observer_node
-from src.nodes.query_builder import query_builder_node
-from src.nodes.search import search_node
-from src.nodes.topics_generator import topics_generator_node
-from src.nodes.content_generator import content_generator_node
+from application.enums.status_enum import StatusEnum
+from services.states.main_state import MainState
+from services.nodes.observer import observer_node
+from services.nodes.query_builder import query_builder_node
+from services.nodes.search import search_node
+from services.nodes.topics_generator import topics_generator_node
+from services.nodes.content_generator import content_generator_node
+from infrastructure.repositories.chekpoints_repository import CheckpointsRepository
 
 class MainGraph():
     def __init__(self):
@@ -17,12 +20,23 @@ class MainGraph():
 
         self.app: CompiledStateGraph = self._build_workflow()
         
-    def run(self, data: dict, checkpoint_id: str | None = None) -> None:
+    def run(self, data: dict) -> None:
         try:
-            if checkpoint_id:
-                self._resume_workflow_from_checkpoint(data["thread_id"], checkpoint_id)
+            if data["status"] == StatusEnum.REPROCESS.value:
+                df: DataFrame = CheckpointsRepository.get(data["checkpoint_id"], data["thread_id"])
+                
+                if len(df) == 0:
+                    raise Exception("")
+                
+                checkpoint: list = df.to_dict("records")[0]
+                
+                df: DataFrame = CheckpointsRepository.get("checkpoint_id", data["thread_id"])
+                
+                self._resume_workflow_from_checkpoint(data["thread_id"], "checkpoint_id")
+            elif data["status"] == StatusEnum.PENDING.value:
+                self._start_workflow(data["subject"], data["thread_id"])
             else:
-                self._start_new_workflow(data["input"], data["thread_id"])
+                raise Exception(f"❌ Status ({data['status']}) do assunto ({data['subject']}) inválido para iniciar o processamento.")
         except Exception as ex:
             raise ex
 
@@ -64,7 +78,7 @@ class MainGraph():
         except Exception as ex:
             raise ex
     
-    def _start_new_workflow(self, input: str, thread_id: str) -> None:
+    def _start_workflow(self, input: str, thread_id: str) -> None:
         try:
             # Já cria o assunto na base com uma thread_id vinculada.
             
