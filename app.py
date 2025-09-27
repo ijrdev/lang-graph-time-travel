@@ -15,7 +15,7 @@ def init() -> None:
         if len(df) > 0:
             subjects: list = df.to_dict("records")
             
-            with ThreadPoolExecutor(max_workers = 1) as executor:
+            with ThreadPoolExecutor(max_workers = 5) as executor:
                 _ = [executor.submit(MainGraph().run, item) for item in subjects]
         else:
             logging.info("⏬ Nenhum assunto foi capturado.")

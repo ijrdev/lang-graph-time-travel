@@ -13,10 +13,7 @@ class SubjectsRepository():
         connection: Connection | None = None
         
         try:
-            try:
-                connection = sqlite3.connect("../../data/db.db", check_same_thread = False)
-            except Exception as ex:
-                connection = sqlite3.connect("data/db.db", check_same_thread = False)
+            connection = sqlite3.connect("../data/db.db", check_same_thread = False)
             
             cursor: Cursor = connection.cursor()
             
@@ -24,6 +21,7 @@ class SubjectsRepository():
                 CREATE TABLE IF NOT EXISTS subjects (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     thread_id TEXT NOT NULL UNIQUE,
+                    checkpoint_id TEXT NULL UNIQUE,
                     created_at DATETIME NOT NULL,
                     updated_at DATETIME NULL,
                     subject TEXT NOT NULL,
@@ -46,18 +44,18 @@ class SubjectsRepository():
         
         try:
             try:
-                connection = sqlite3.connect("../../data/db.db", check_same_thread = False)
+                connection = sqlite3.connect("../data/db.db", check_same_thread = False)
             except Exception as ex:
                 connection = sqlite3.connect("data/db.db", check_same_thread = False)
             
             cursor: sqlite3.Cursor = connection.cursor()
             
             query: str = """
-                INSERT INTO subjects (thread_id, created_at, updated_at, subject, status)
-                VALUES (?, ?, ?, ?, ?)
+                INSERT INTO subjects (checkpoint_id, thread_id, created_at, updated_at, subject, status)
+                VALUES (?, ?, ?, ?, ?, ?)
             """
             
-            cursor.execute(query, (str(uuid.uuid4()), datetime.now().isoformat(), None, subject, StatusEnum.PENDING.value,))
+            cursor.execute(query, (None, str(uuid.uuid4()), datetime.now().isoformat(), None, subject, StatusEnum.PENDING.value,))
             
             connection.commit()
         except Exception as ex:
@@ -68,27 +66,29 @@ class SubjectsRepository():
                 connection.close()
     
     @classmethod
-    def update(cls, id: int, subject: str, status: str | None) -> None:
+    def update(cls, id: int, subject: str, checkpoint_id: str | None = None, status: str | None = None) -> None:
         connection: Connection | None = None
         
         try:
             try:
-                connection = sqlite3.connect("../../data/db.db", check_same_thread = False)
+                connection = sqlite3.connect("../data/db.db", check_same_thread = False)
             except Exception as ex:
                 connection = sqlite3.connect("data/db.db", check_same_thread = False)
             
             cursor: Cursor = connection.cursor()
             
-            query: str = "UPDATE subjects"
-            params: tuple = ()
-                 
-            if status:
-                params += (subject, datetime.now().isoformat(), status, id)
-                query += " SET subject = ?, updated_at = ?, status = ?"
-            else:
-                params += (subject, datetime.now().isoformat(), id)
-                query += " SET subject = ?, updated_at = ?"
+            query: str = "UPDATE subjects SET subject = ?, updated_at = ?"
+            params: tuple = (subject, datetime.now().isoformat())
+
+            if checkpoint_id:
+                query += ", checkpoint_id = ?"
+                params += (checkpoint_id)
             
+            if status:
+                query += ", status = ?"
+                params += (status)
+            
+            params += (id)
             query += " WHERE id = ?"
             
             cursor.execute(query, params)
@@ -106,7 +106,7 @@ class SubjectsRepository():
         
         try:
             try:
-                connection = sqlite3.connect("../../data/db.db", check_same_thread = False)
+                connection = sqlite3.connect("../data/db.db", check_same_thread = False)
             except Exception as ex:
                 connection = sqlite3.connect("data/db.db", check_same_thread = False)
             
@@ -129,7 +129,7 @@ class SubjectsRepository():
         
         try:
             try:
-                connection = sqlite3.connect("../../data/db.db", check_same_thread = False)
+                connection = sqlite3.connect("../data/db.db", check_same_thread = False)
             except Exception as ex:
                 connection = sqlite3.connect("data/db.db", check_same_thread = False)
             

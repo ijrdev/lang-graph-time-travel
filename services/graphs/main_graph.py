@@ -7,7 +7,6 @@ from langgraph.checkpoint.sqlite import SqliteSaver
 
 from application.enums.status_enum import StatusEnum
 from services.states.main_state import MainState
-from services.nodes.observer import observer_node
 from services.nodes.query_builder import query_builder_node
 from services.nodes.search import search_node
 from services.nodes.topics_generator import topics_generator_node
@@ -30,9 +29,7 @@ class MainGraph():
                 
                 checkpoint: list = df.to_dict("records")[0]
                 
-                df: DataFrame = CheckpointsRepository.get("checkpoint_id", data["thread_id"])
-                
-                self._resume_workflow_from_checkpoint(data["thread_id"], "checkpoint_id")
+                self._resume_workflow(data["thread_id"], "checkpoint_id")
             elif data["status"] == StatusEnum.PENDING.value:
                 self._start_workflow(data["subject"], data["thread_id"])
             else:
@@ -44,14 +41,12 @@ class MainGraph():
         try:
             workflow: StateGraph = StateGraph(MainState)
             
-            workflow.add_node("observer", observer_node)
             workflow.add_node("query_builder", query_builder_node)
             workflow.add_node("search", search_node)
             workflow.add_node("topic_generator", topics_generator_node)
             workflow.add_node("content_generator", content_generator_node)
             
-            workflow.set_entry_point("observer")
-            workflow.add_edge("observer", "query_builder")
+            workflow.set_entry_point("query_builder")
             workflow.add_edge("query_builder", "search")
             workflow.add_edge("search", "topic_generator")
             workflow.add_edge("topic_generator", "content_generator")
@@ -61,7 +56,7 @@ class MainGraph():
         except Exception as ex:
             raise ex
 
-    def _resume_workflow_from_checkpoint(self, thread_id: str, checkpoint_id: str) -> None:
+    def _resume_workflow(self, thread_id: str, checkpoint_id: str) -> None:
         try:
             logging.info(f"Resumindo execução de um checkpoint_id: {checkpoint_id}.")
         
@@ -80,8 +75,6 @@ class MainGraph():
     
     def _start_workflow(self, input: str, thread_id: str) -> None:
         try:
-            # Já cria o assunto na base com uma thread_id vinculada.
-            
             logging.info(f"Iniciando um novo workflow com a thread_id: {thread_id}.")
             
             self.app.invoke({"input": input}, {"configurable": {"thread_id": thread_id}})

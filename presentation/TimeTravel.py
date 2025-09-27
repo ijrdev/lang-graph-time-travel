@@ -34,7 +34,8 @@ df["updated_at"] = pd.to_datetime(df["updated_at"])
 df["updated_at"] = df["updated_at"].dt.strftime("%d/%m/%Y %H:%M:%S")
 
 df = df.rename(columns = {
-    "thread_id": "ID da Thread",
+    "thread_id": "Thread",
+    "checkpoint_id": "Checkpoint",
     "created_at": "Data de Criação",
     "updated_at": "Data de Atualização",
     "subject": "Assunto",
