@@ -66,7 +66,7 @@ class SubjectsRepository():
                 connection.close()
     
     @classmethod
-    def update(cls, id: int, subject: str, checkpoint_id: str | None = None, status: str | None = None) -> None:
+    def update(cls, id: int, checkpoint_id: str | None = None, status: str | None = None) -> None:
         connection: Connection | None = None
         
         try:
@@ -77,8 +77,8 @@ class SubjectsRepository():
             
             cursor: Cursor = connection.cursor()
             
-            query: str = "UPDATE subjects SET subject = ?, updated_at = ?"
-            params: tuple = (subject, datetime.now().isoformat())
+            query: str = "UPDATE subjects SET updated_at = ?"
+            params: tuple = (datetime.now().isoformat())
 
             if checkpoint_id:
                 query += ", checkpoint_id = ?"

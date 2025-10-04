@@ -15,6 +15,9 @@ def init() -> None:
         if len(df) > 0:
             subjects: list = df.to_dict("records")
             
+            for subject in subjects:
+                SubjectsRepository.update(id = subject["id"], checkpoint_id = None, status = StatusEnum.PROCESSING.value)
+            
             with ThreadPoolExecutor(max_workers = 5) as executor:
                 _ = [executor.submit(MainGraph().run, item) for item in subjects]
         else:

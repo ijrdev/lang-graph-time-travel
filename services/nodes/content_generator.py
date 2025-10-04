@@ -2,63 +2,84 @@ import logging, os
 
 from datetime import datetime
 
+from langgraph.graph.state import CompiledStateGraph
 from langchain.prompts import PromptTemplate
 from langchain.chat_models import init_chat_model
+from langchain_community.tools import TavilySearchResults
 
+from application.enums.status_enum import StatusEnum
 from services.states.main_state import MainState
+from infrastructure.repositories.subjects_repository import SubjectsRepository
 
-def content_generator_node(state: MainState) -> MainState:
+PROMPT = """
+    # Escritor especialista em criar conteúdos informativos, bem estruturados e envolventes
+
+    ## Contexto
+
+    Você deve criar um conteúdo final completo baseando-se nos dados fornecidos.
+
+    - Cada dado conterá um tópico e uma lista de conteúdos capturados da web relacionados a esse tópico;
+        - Cada conteúdo terá título, URL, conteúdo completo ou resumo, pontuação de relevância e texto bruto;
+        - Fique atento caso hava conteúdos que não façam sentido ou estejam corrompidos, neste caso, ignore-os;
+    - Você deve analisar todos os conteúdos relacionados a cada tópico para criar um material coeso e informativo;
+    - O conteúdo final deve ser dividido em seções claras, cada uma focada em um tópico específico;
+    - Incorpore informações relevantes de cada conteúdo, garantindo que o texto flua naturalmente;
+
+    ## Regras
+    
+    - Use linguagem clara, objetiva e envolvente;
+    - Evite jargões técnicos, a menos que sejam essenciais para o entendimento;
+    - Não invente informações, baseie-se somente no que foi capturado;
+    - Use formatação adequada, como títulos, subtítulos, listas, ícones e parágrafos para melhorar a legibilidade;
+    - Revise o texto para corrigir erros gramaticais e de digitação;
+    - Sua linguagem de saída é unicamente em português (brasil), mesmo que o conteúdo analisado esteja em outro idioma;
+    - Priorize qualidade e relevância da informação, focando em entregar valor ao leitor;
+    - Seja criativo e original na abordagem do tema, tornando o conteúdo interessante e único;
+    
+    ## Exemplo do conteúdo da saída (obrigatoriamente deve ser em markdown)
+
+    ```markdown
+    # [Título Principal Atraente]
+
+    ## Introdução
+    [Parágrafo contextualizando o tema]
+
+    ## [Tópico 1]
+    [Desenvolvimento com pelo menos 1-3 parágrafos]
+
+    ## [Tópico 2]
+    [Desenvolvimento com pelo menos 1-3 parágrafos]
+
+    ## [Tópico N]
+    [Desenvolvimento com pelo menos 1-3 parágrafos]
+
+    ## Conclusão
+    [Síntese e reflexões finais]
+    ```
+
+    ## Dados
+
+    {data}
+"""
+
+def content_generator_node(state: MainState, graph: CompiledStateGraph, config: dict) -> MainState:
+    graph_state = graph.get_state(config)
+    
     try:
         init_datetime: datetime = datetime.now()
         
-        PROMPT = """
-            # Query Builder para Pesquisa Web
-
-            ## Papel
+        local_data_searches: list = []
+        
+        for item in state.topics:
+            tool = TavilySearchResults(
+                max_results = 1,
+                include_answer = True,
+                include_raw_content = True,
+                include_images = False,
+                search_depth = "advanced"
+            )
             
-            Você é um **construtor de consultas** especializado em transformar qualquer assunto fornecido pelo usuário em uma **query clara e adequada para pesquisa na web**.
-
-            ## Contexto
-            
-            Usuários informam diferentes assuntos (curtos, longos, específicos ou vagos). Sua função é entender o que foi passado e devolver uma versão pronta para ser usada em mecanismos de busca.
-
-            ## Objetivo
-            
-            Gerar uma **query otimizada para pesquisa web**, mantendo fidelidade ao assunto informado e tornando-o pesquisável.
-            - Se o assunto já estiver claro, apenas padronize e organize.
-            - Se estiver ambíguo, normalize para um formato que maximize a chance de encontrar resultados relevantes.
-            - Nunca adicione informações que não foram fornecidas.
-
-            ## Diretrizes
-            
-            1. **Preservar o núcleo do assunto** – não inventar ou inferir detalhes não citados.
-            2. **Reescrever para pesquisabilidade** – ajustar para termos que um buscador entenderia bem.
-            3. **Equilibrar especificidade e abrangência** – nem tão genérico que perca relevância, nem tão limitado que exclua resultados úteis.
-            4. **Saída em formato direto** – apenas a query final, sem explicações adicionais.
-            5. **Aceitar tanto entradas curtas quanto longas** – sempre devolver algo utilizável na pesquisa.
-            6. **Se o texto já estiver em formato de query válido**, apenas retorne-o ajustado para consistência.
-
-            ## Exemplos
-
-            - Assunto: `"receitas fáceis de bolo de chocolate com cobertura"`  
-            - Query: `receitas bolo de chocolate cobertura fácil`
-
-            - Assunto: `"tendências de inteligência artificial em 2025 para empresas de tecnologia"`  
-            - Query: `tendências inteligência artificial 2025 empresas tecnologia`
-
-            - Assunto: `"clima Brasil hoje"`  
-            - Query: `clima Brasil hoje`
-
-            - Assunto: `"tutorial como configurar roteador wifi tp-link"`  
-            - Query: `configurar roteador wifi tp-link tutorial`
-
-            - Assunto: `"notícias sobre guerra na Ucrânia"`  
-            - Query: `notícias guerra Ucrânia`
-            
-            ## Assunto fornecido pelo usuário
-            
-            {subject}
-        """
+            local_data_searches.append({"topic": item["topic"], "contents": tool.invoke({'query': item["topic"]})})
         
         model = init_chat_model(
             model_provider = os.getenv("GOOGLE_MODEL_PROVIDER"),
@@ -68,12 +89,16 @@ def content_generator_node(state: MainState) -> MainState:
             max_retries = int(os.getenv("GOOGLE_MAX_RETRIES"))
         )
         
-        response = model.invoke(PromptTemplate(template = PROMPT, input_variables = ["subject"]).format(subject = state.input))
+        response = model.invoke(PromptTemplate(template = PROMPT, input_variables = ["data"]).format(data = local_data_searches))
         
-        state.query_builder = response.content.strip()
+        state.content = response.content.strip()
         
-        logging.info(f"query_builder_node: {(datetime.now() - init_datetime).total_seconds()}")
+        SubjectsRepository.update(id = state.subject_id, checkpoint_id = graph_state.config["configurable"]["checkpoint_id"], status = StatusEnum.DONE.value)
+        
+        logging.info(f"📝 content_generator_node: {(datetime.now() - init_datetime).total_seconds()}")
         
         return state
     except Exception as ex:
+        SubjectsRepository.update(id = state.subject_id, checkpoint_id = graph_state.config["configurable"]["checkpoint_id"], status = StatusEnum.ERROR.value)
+        
         raise ex

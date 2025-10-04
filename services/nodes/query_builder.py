@@ -2,63 +2,64 @@ import os, logging
 
 from datetime import datetime
 
+from langgraph.graph.state import CompiledStateGraph
 from langchain.prompts import PromptTemplate
 from langchain.chat_models import init_chat_model
 
+from application.enums.status_enum import StatusEnum
 from services.states.main_state import MainState
+from infrastructure.repositories.subjects_repository import SubjectsRepository
 
-def query_builder_node(state: MainState) -> MainState:
+PROMPT = """
+    # Especialista em construir query otimizadas para pesquisa na web
+
+    ## Contexto
+    
+    Usuários informam diferentes assuntos (curtos, longos, específicos, vagos, etc). Sua função é entender o que foi passado e devolver uma versão pronta para ser usada em mecanismos de busca.
+
+    ## Diretrizes
+    
+    - Remova ambiguidades e termos vagos, faça o melhor para inferir a intenção e focar a query;
+    - Se o assunto for muito específico, mantenha os detalhes essenciais para garantir relevância;
+    - Priorize palavras que provavelmente trarão resultados úteis e relevantes;
+    - Considere o uso de sinônimos ou palavras relacionados para ampliar a busca, se apropriado;
+    - Adicione contexto temporal quando aplicável, por exemplo: "2024", "recente", "últimas novidades". Lembrando que a data atual é {current_date};
+    - Se o assunto envolver múltiplos tópicos, tente focar nas partes mais relevantes ou combinar palavras de forma eficaz para a busca;
+
+    ## Regras
+    
+    - Retorne APENAS a query otimizada, sem explicações adicionais;
+    - Assuma que a busca é em inglês, a menos que a solicitação do usuário especifique outro idioma;
+    - Evite repetir palavras desnecessariamente;
+    - Não inclua aspas ou pontuação desnecessária na query;
+    - Mantenha a query concisa usando idealmente entre 3-8 palavras;
+    - Evite stop words desnecessáriosc como "o", "a", "de", etc, quando não agregam valor;
+    
+    ## Exemplos
+
+    - Assunto: "Quero saber sobre as últimas novidades em inteligência artificial"
+    - Query otimizada: inteligência artificial novidades 2025 tendências
+
+    - Assunto: "Me explique como funciona a fotossíntese nas plantas"
+    - Query otimizada: fotossíntese plantas processo funcionamento
+
+    - Assunto: "Preciso de receitas saudáveis para o café da manhã"
+    - Query otimizada: receitas café manhã saudáveis nutritivas
+
+    - Assunto: "Quais são os melhores frameworks JavaScript para desenvolvimento web em 2025?"
+    - Query otimizada: melhores frameworks JavaScript 2025 desenvolvimento web
+
+    - Assunto: "Como investir em criptomoedas para iniciantes"
+    - Query otimizada: investir criptomoedas iniciantes guia 2024
+    
+    ## Assunto fornecido pelo usuário
+    
+    {subject}
+"""
+        
+def query_builder_node(state: MainState, graph: CompiledStateGraph, config: dict) -> MainState:
     try:
         init_datetime: datetime = datetime.now()
-        
-        PROMPT = """
-            # Query Builder para Pesquisa Web
-
-            ## Papel
-            
-            Você é um **construtor de consultas** especializado em transformar qualquer assunto fornecido pelo usuário em uma **query clara e adequada para pesquisa na web**.
-
-            ## Contexto
-            
-            Usuários informam diferentes assuntos (curtos, longos, específicos ou vagos). Sua função é entender o que foi passado e devolver uma versão pronta para ser usada em mecanismos de busca.
-
-            ## Objetivo
-            
-            Gerar uma **query otimizada para pesquisa web**, mantendo fidelidade ao assunto informado e tornando-o pesquisável.
-            - Se o assunto já estiver claro, apenas padronize e organize.
-            - Se estiver ambíguo, normalize para um formato que maximize a chance de encontrar resultados relevantes.
-            - Nunca adicione informações que não foram fornecidas.
-
-            ## Diretrizes
-            
-            1. **Preservar o núcleo do assunto** – não inventar ou inferir detalhes não citados.
-            2. **Reescrever para pesquisabilidade** – ajustar para termos que um buscador entenderia bem.
-            3. **Equilibrar especificidade e abrangência** – nem tão genérico que perca relevância, nem tão limitado que exclua resultados úteis.
-            4. **Saída em formato direto** – apenas a query final, sem explicações adicionais.
-            5. **Aceitar tanto entradas curtas quanto longas** – sempre devolver algo utilizável na pesquisa.
-            6. **Se o texto já estiver em formato de query válido**, apenas retorne-o ajustado para consistência.
-
-            ## Exemplos
-
-            - Assunto: `"receitas fáceis de bolo de chocolate com cobertura"`  
-            - Query: `receitas bolo de chocolate cobertura fácil`
-
-            - Assunto: `"tendências de inteligência artificial em 2025 para empresas de tecnologia"`  
-            - Query: `tendências inteligência artificial 2025 empresas tecnologia`
-
-            - Assunto: `"clima Brasil hoje"`  
-            - Query: `clima Brasil hoje`
-
-            - Assunto: `"tutorial como configurar roteador wifi tp-link"`  
-            - Query: `configurar roteador wifi tp-link tutorial`
-
-            - Assunto: `"notícias sobre guerra na Ucrânia"`  
-            - Query: `notícias guerra Ucrânia`
-            
-            ## Assunto fornecido pelo usuário
-            
-            {subject}
-        """
         
         model = init_chat_model(
             model_provider = os.getenv("GOOGLE_MODEL_PROVIDER"),
@@ -68,12 +69,16 @@ def query_builder_node(state: MainState) -> MainState:
             max_retries = int(os.getenv("GOOGLE_MAX_RETRIES"))
         )
         
-        response = model.invoke(PromptTemplate(template = PROMPT, input_variables = ["subject"]).format(subject = state.input))
+        response = model.invoke(PromptTemplate(template = PROMPT, input_variables = ["subject"]).format(current_date = datetime.now().strftime("%Y-%m-%d")))
         
         state.query_builder = response.content.strip()
         
-        logging.info(f"query_builder_node: {(datetime.now() - init_datetime).total_seconds()}")
+        logging.info(f"⚙️ query_builder_node: {(datetime.now() - init_datetime).total_seconds()}")
         
         return state
     except Exception as ex:
+        graph_state = graph.get_state(config)
+        
+        SubjectsRepository.update(id = state.subject_id, checkpoint_id = graph_state.config["configurable"]["checkpoint_id"], status = StatusEnum.ERROR.value)
+        
         raise ex
